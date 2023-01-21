@@ -1,4 +1,4 @@
-from typing import Callable, Iterator
+from typing import Callable, Dict, Iterator, Set
 
 import asyncio
 import os
@@ -22,8 +22,8 @@ bot = commands.Bot(
     intents=intents, 
 )
 
-member_id_cache = set()
-webhook_cache = dict()
+member_id_cache: Set[int] = set()
+webhook_cache: Dict[int, discord.Webhook] = dict()
 gif_cache = [
     "https://tenor.com/view/genshin-genshin-impact-gif-22076439",
     "https://tenor.com/view/genshin-impact-walter-white-funny-museum-gif-20562746",
@@ -76,18 +76,28 @@ async def on_message(message: discord.Message):
     if message.author.id in member_id_cache and contains_genshin(message.content):
         author = message.author
         gif_url = get_gif_url()
+        avatar_url = None
+        if author.avatar is not None:
+            avatar_url = author.avatar.url
+            
         channel = message.channel
         if channel.id not in webhook_cache:
             webhook_cache[channel.id] = await channel.create_webhook(name="Genshinsultinator webhook")
         webhook = webhook_cache[channel.id]
-        avatar_url = None
-        if author.avatar is not None:
-            avatar_url = author.avatar.url
-        await webhook.send(
-            gif_url,
-            username=author.display_name,
-            avatar_url=avatar_url,
-        )
+        try:
+            await webhook.send(
+                gif_url,
+                username=author.display_name,
+                avatar_url=avatar_url,
+            )
+        except discord.errors.NotFound:
+            webhook_cache[channel.id] = await channel.create_webhook(name="Genshinsultinator webhook")
+            webhook = webhook_cache[channel.id]
+            await webhook.send(
+                gif_url,
+                username=author.display_name,
+                avatar_url=avatar_url,
+            )
     
 @bot.event
 async def on_command_error(ctx: commands.Context, error: commands.errors.CommandError):
@@ -116,7 +126,8 @@ def contains_genshin(content: str) -> bool:
 @bot.command()
 async def clear(ctx: commands.Context):
     """Clear existing webhooks."""
-    await asyncio.gather(*map(lambda webhook: webhook.delete()), webhook_cache.values())
+    await asyncio.gather(*map(lambda webhook: webhook.delete(), webhook_cache.values()))
+    await ctx.send("Cleared webhooks")
     
 def gif_generator() -> Iterator[str]:
     previous = random.choice(gif_cache)
