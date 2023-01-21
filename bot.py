@@ -69,7 +69,7 @@ async def add(ctx: commands.Context, *names: str):
             await ctx.send(f"Failed to add member with name {name}")
         else:
             member_id_cache.add(member.id)
-            await ctx.send(f"Sucessfully added {member.name}#{member.discriminator}")
+            await ctx.send(f"Successfully added {member.name}#{member.discriminator}")
     
 def contains_genshin(content: str) -> bool:
     return len(find_near_matches("genshin", content.lower(), max_l_dist=1)) > 0
