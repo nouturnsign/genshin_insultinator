@@ -1,5 +1,8 @@
-import logging
+from typing import Callable, Iterator
+
+import asyncio
 import os
+import random
 
 import discord
 from discord.ext import commands
@@ -19,8 +22,44 @@ bot = commands.Bot(
     intents=intents, 
 )
 
-logger = logging.getLogger("discord")
 member_id_cache = set()
+webhook_cache = dict()
+gif_cache = [
+    "https://tenor.com/view/genshin-genshin-impact-gif-22076439",
+    "https://tenor.com/view/genshin-impact-walter-white-funny-museum-gif-20562746",
+    "https://tenor.com/view/genshin-impact-meme-memes-funny-fat-gif-23970523",
+    "https://tenor.com/view/ganyu-ganyu-genshin-ganyu-genshin-impact-genshin-genshin-impact-gif-24744035",
+    "https://tenor.com/view/klee-klee-genshin-impact-genshin-impact-genshin-meme-gif-25645250",
+    "https://tenor.com/view/genshin-impact-genshin-genshin-meme-genshin-memes-gif-23777472",
+    "https://tenor.com/view/genshin-genshin-meme-meme-funny-no-bitches-gif-25083047",
+    "https://tenor.com/view/genshin-dream-funny-meme-gif-21901016",
+    "https://tenor.com/view/genshin-pov-relatable-gif-25155083",
+    "https://tenor.com/view/kazuha-inazuma-genshin-impact-memes-kazuha-genshin-impact-kazuha-inazuma-gif-23310313",
+    "https://tenor.com/view/genshin-impact-fans-genshin-meme-george-floyd-genshin-impact-explaining-meme-gif-23922047",
+    "https://tenor.com/view/diluc-genshin-impact-genshin-impact-diluc-genshin-meme-genshin-impact-meme-gif-26111438",
+    "https://tenor.com/view/genshin-impact-ayaka-genshin-genshin-meme-gif-24799576",
+    "https://tenor.com/view/oh-my-goodness-oh-my-goodness-gracious-oh-my-goodness-gracious-meme-itto-arataki-arataki-itto-gif-24181385",
+    "https://tenor.com/view/genshin-impact-genshin-vrchat-vrc-vrchat-fliptripp-gif-21325438",
+    "https://tenor.com/view/nikocado-avocado-genshin-impact-meme-gif-26538057",
+    "https://tenor.com/view/ganyu-genshin-meme-genshin-impact-cocogoat-sad-gif-23308780",
+    "https://tenor.com/view/genshin-impact-meme-genshin-impact-players-going-to-bed-gif-25699251",
+    "https://tenor.com/view/genshin-impact-noelle-noelle-genshin-cringe-cringe-detected-gif-23973555",
+    "https://tenor.com/view/genshin-impact-genshin-meme-memes-funny-gif-26357403",
+    "https://tenor.com/view/genshin-genshin-impact-genshin-impact-fan-mihoyo-gif-21922389",
+    "https://tenor.com/view/genshin-impact-players-after-not-playing-for-a-day-gif-24104482",
+    "https://tenor.com/view/genshin-players-genshin-impact-player-genshin-impact-players-genshin-player-zy0x-gif-24714837",
+    "https://tenor.com/view/pov-you-dont-play-genshin-impact-genshin-impact-gif-22769513",
+    "https://tenor.com/view/genshin-impact-player-when-gif-22673256",
+    "https://tenor.com/view/genshin-impact-gif-23394265",
+    "https://tenor.com/view/genshin-genshin-impact-players-when-gambling-venezuela-gif-22448227",
+    "https://tenor.com/view/genshin-genshin-impact-paimon-paimon-food-gif-18876173",
+    "https://tenor.com/view/genshin-impact-genshin-genshin-impact-players-anime-coom-gif-26171509",
+    "https://tenor.com/view/swag-city-note-discord-genshin-impact-gif-18759787",
+    "https://tenor.com/view/kizuna-ai-genshin-players-genshin-impact-gif-25084264",
+    "https://tenor.com/view/genshin-gif-20317024",
+    "https://tenor.com/view/dad-i-like-genshin-genshin-impact-dad-i-like-genshin-impact-gif-24535079",
+    "https://tenor.com/view/genshin-impact-nerd-nerd-emoji-genshin-gif-23413935",
+]
 
 @bot.event
 async def on_message(message: discord.Message):
@@ -34,33 +73,33 @@ async def on_message(message: discord.Message):
         await bot.process_commands(message)
         return 
     
-    if message.author.id in member_id_cache and "genshin" in message.content:
+    if message.author.id in member_id_cache and contains_genshin(message.content):
         author = message.author
         gif_url = get_gif_url()
         channel = message.channel
-        hook = await channel.create_webhook(name="Genshinsultinator hook")
+        if channel.id not in webhook_cache:
+            webhook_cache[channel.id] = await channel.create_webhook(name="Genshinsultinator webhook")
+        webhook = webhook_cache[channel.id]
         avatar_url = None
         if author.avatar is not None:
             avatar_url = author.avatar.url
-        await hook.send(
+        await webhook.send(
             gif_url,
             username=author.display_name,
             avatar_url=avatar_url,
         )
-        await hook.delete()
     
 @bot.event
 async def on_command_error(ctx: commands.Context, error: commands.errors.CommandError):
     if isinstance(error, commands.errors.CommandNotFound):
         await ctx.send(f"Command not found. Try using `{bot.command_prefix}help`")
-    logger.error(f"Error: {error}")
+    print(f"Error: {error}")
     
 @bot.command()
 async def add(ctx: commands.Context, *names: str):
     """Add a member to the insultinator."""
     guild = ctx.guild
     if guild is None:
-        logger.warning("Could not find guild")
         return
     
     for name in names:
@@ -73,8 +112,28 @@ async def add(ctx: commands.Context, *names: str):
     
 def contains_genshin(content: str) -> bool:
     return len(find_near_matches("genshin", content.lower(), max_l_dist=1)) > 0
+
+@bot.command()
+async def clear(ctx: commands.Context):
+    """Clear existing webhooks."""
+    await asyncio.gather(*map(lambda webhook: webhook.delete()), webhook_cache.values())
     
-def get_gif_url() -> str:
-    return "https://tenor.com/view/genshin-impact-walter-white-funny-museum-gif-20562746"
+def gif_generator() -> Iterator[str]:
+    previous = random.choice(gif_cache)
+    yield previous 
+    while True:
+        gif_cache.remove(previous)
+        current = random.choice(gif_cache)
+        yield current
+        gif_cache.append(previous)
+        previous = current
     
+def _make_get_gif_url() -> Callable[[], str]:
+    generator = gif_generator()
+    def get_gif_url() -> str:
+        return next(generator)
+    return get_gif_url
+
+get_gif_url = _make_get_gif_url()
+
 bot.run(DISCORD_TOKEN)
