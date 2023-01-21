@@ -1,8 +1,10 @@
+import logging
 import os
 
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+from fuzzysearch import find_near_matches
 
 load_dotenv()
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
@@ -17,6 +19,7 @@ bot = commands.Bot(
     intents=intents, 
 )
 
+logger = logging.getLogger("discord")
 member_id_cache = set()
 
 @bot.event
@@ -49,20 +52,27 @@ async def on_message(message: discord.Message):
 @bot.event
 async def on_command_error(ctx: commands.Context, error: commands.errors.CommandError):
     if isinstance(error, commands.errors.CommandNotFound):
-        await ctx.send(f'Command not found. Try using `{bot.command_prefix}help`')
-    raise error
+        await ctx.send(f"Command not found. Try using `{bot.command_prefix}help`")
+    logger.error(f"Error: {error}")
     
 @bot.command()
 async def add(ctx: commands.Context, *names: str):
     """Add a member to the insultinator."""
     guild = ctx.guild
+    if guild is None:
+        logger.warning("Could not find guild")
+        return
+    
     for name in names:
         member = guild.get_member_named(name)
-        member_id_cache.add(member.id)
-        await ctx.send(f"Sucessfully added {member.name}#{member.discriminator}")
+        if member is None:
+            await ctx.send(f"Failed to add member with name {name}")
+        else:
+            member_id_cache.add(member.id)
+            await ctx.send(f"Sucessfully added {member.name}#{member.discriminator}")
     
 def contains_genshin(content: str) -> bool:
-    return "genshin" in content
+    return len(find_near_matches("genshin", content.lower(), max_l_dist=1)) > 0
     
 def get_gif_url() -> str:
     return "https://tenor.com/view/genshin-impact-walter-white-funny-museum-gif-20562746"
