@@ -227,7 +227,7 @@ def _make_contains_genshin_character() -> Callable[[], bool]:
         def contains_genshin_character(content: str) -> bool:
             content = content.lower()
             for genshin_character in genshin_characters_lower:
-                if len(find_near_matches(genshin_character, content, max_l_dist=1)) > 0:
+                if len(find_near_matches(genshin_character, content, max_l_dist=0)) > 0:
                     return True
             return False
         return contains_genshin_character
