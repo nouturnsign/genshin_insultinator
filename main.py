@@ -1,4 +1,6 @@
-from typing import Callable, Dict, Iterator, Optional, Set
+from __future__ import annotations
+
+from typing import Callable, Dict, Iterator, Optional, Set, TYPE_CHECKING
 
 import asyncio
 import os
@@ -12,6 +14,13 @@ from fuzzysearch import find_near_matches
 load_dotenv()
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
 
+if TYPE_CHECKING:
+    Member = discord.Member
+    Webhook = discord.Webhook
+    Message = discord.Message
+    Context = commands.Context
+    MessageableChannel = discord.abc.MessageableChannel
+
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
@@ -22,8 +31,8 @@ bot = commands.Bot(
     intents=intents, 
 )
 
-member_cache: Set[discord.Member] = set()
-webhook_cache: Dict[discord.abc.MessageableChannel, discord.Webhook] = dict()
+member_cache: Set[Member] = set()
+webhook_cache: Dict[MessageableChannel, Webhook] = dict()
 gif_cache = [
     "https://tenor.com/view/genshin-genshin-impact-gif-22076439",
     "https://tenor.com/view/genshin-impact-walter-white-funny-museum-gif-20562746",
@@ -62,7 +71,7 @@ gif_cache = [
 ]
 
 @bot.event
-async def on_message(message: discord.Message):
+async def on_message(message: Message):
     if not bot.is_ready():
         return 
     if message.author.bot:
@@ -82,7 +91,7 @@ async def on_message(message: discord.Message):
         channel = message.channel
         await retry_webhook_send(3, channel, gif_url, username, avatar_url)
             
-async def retry_webhook_send(max_retries: int, channel: discord.abc.MessageableChannel, gif_url: str, username: str, avatar_url: Optional[str]):
+async def retry_webhook_send(max_retries: int, channel: MessageableChannel, gif_url: str, username: str, avatar_url: Optional[str]):
     success = False
     for _ in range(max_retries):
         if success:
@@ -103,13 +112,13 @@ async def retry_webhook_send(max_retries: int, channel: discord.abc.MessageableC
             raise exc 
     
 @bot.event
-async def on_command_error(ctx: commands.Context, error: commands.errors.CommandError):
+async def on_command_error(ctx: Context, error: commands.errors.CommandError):
     if isinstance(error, commands.errors.CommandNotFound):
         await ctx.send(f"Command not found. Try using `{bot.command_prefix}help`")
     print(f"Error: {error}")
     
 @bot.command()
-async def add(ctx: commands.Context, *names: str):
+async def add(ctx: Context, *names: str):
     """Add a member to the insultinator."""
     guild = ctx.guild
     if guild is None:
@@ -127,7 +136,7 @@ def contains_genshin(content: str) -> bool:
     return len(find_near_matches("genshin", content.lower(), max_l_dist=1)) > 0
 
 @bot.command()
-async def clear(ctx: commands.Context):
+async def clear(ctx: Context):
     """Clear existing webhooks."""
     await asyncio.gather(*map(lambda webhook: webhook.delete(), filter(lambda webhook: webhook.guild == ctx.guild, webhook_cache.values())))
     await ctx.send("Cleared webhooks")
