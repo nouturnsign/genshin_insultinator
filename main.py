@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from typing import Callable, Dict, Iterator, Optional, Set, TYPE_CHECKING
+from typing import Callable, Dict, Literal, Iterator, Optional, Set, TYPE_CHECKING
 
 import asyncio
 import os
 import random
 
 import discord
+import requests
+from bs4 import BeautifulSoup
 from discord.ext import commands
 from dotenv import load_dotenv
 from fuzzysearch import find_near_matches
@@ -131,9 +133,6 @@ async def add(ctx: Context, *names: str):
             continue
         member_cache.add(member)
         await ctx.send(f"Successfully added: {member.name}#{member.discriminator}")
-    
-def contains_genshin(content: str) -> bool:
-    return len(find_near_matches("genshin", content.lower(), max_l_dist=1)) > 0
 
 @bot.command()
 async def clear(ctx: Context):
@@ -163,5 +162,47 @@ def _make_get_gif_url() -> Callable[[], str]:
 _get_gif_url = _make_get_gif_url()
 def get_gif_url() -> str:
     return _get_gif_url()
+
+def scrape_genshin_characters() -> list[str]:
+    r = requests.get("https://genshin.gg/")
+    r.raise_for_status()
+    soup = BeautifulSoup(r.content, features="html.parser")
+    genshin_characters = []
+    character_list_div = soup.find("div", attrs={"class": "character-list"})
+    if character_list_div is None:
+        return genshin_characters
+    for character_portrait_a in character_list_div.find_all("a", attrs={"class": "character-portrait"}):
+        character_portrait_h2 = character_portrait_a.find("h2")
+        if character_portrait_h2 is None:
+            continue
+        genshin_characters.append(character_portrait_h2.get_text())
+    return genshin_characters
+        
+def _make_contains_genshin_character() -> Callable[[], bool]:
+    try:
+        genshin_characters = scrape_genshin_characters()
+    except requests.HTTPError:
+        def always_true(content: str) -> Literal[True]:
+            return True
+        return always_true 
+    else:
+        genshin_characters_lower = list(map(lambda content: content.lower(), genshin_characters))
+        def contains_genshin_character(content: str) -> bool:
+            content = content.lower()
+            for genshin_character in genshin_characters_lower:
+                if len(find_near_matches(genshin_character, content, max_l_dist=1)) > 0:
+                    return True
+            return False
+        return contains_genshin_character
+
+_contains_genshin_character = _make_contains_genshin_character()
+def contains_genshin_character(content: str) -> bool:
+    return _contains_genshin_character(content)
+
+def contains_genshin_fuzzy(content: str) -> bool:
+    return len(find_near_matches("genshin", content.lower(), max_l_dist=1)) > 0
+
+def contains_genshin(content: str) -> bool:
+    return contains_genshin_fuzzy(content) or contains_genshin_character(content)
 
 bot.run(DISCORD_TOKEN)
