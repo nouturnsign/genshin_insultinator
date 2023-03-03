@@ -151,11 +151,17 @@ async def on_command_error(ctx: Context, error: commands.errors.CommandError):
     
 @bot.command()
 async def add(ctx: Context, *names: str):
-    """Add a member to the insultinator. Use name, nickname, or name#discriminator to lookup."""
+    """Add space-separated members to the insultinator. Use name, nickname, or name#discriminator to lookup. If no names are supplied, adds yourself."""
     guild = ctx.guild
     if guild is None:
         return
     
+    if len(names) == 0:
+        author = ctx.message.author
+        member_cache.add(author)
+        await ctx.send(f"Successfully added: {author.name}#{author.discriminator}")
+        return
+        
     for name in names:
         member = guild.get_member_named(name)
         if member is None:
