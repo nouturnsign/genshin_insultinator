@@ -126,18 +126,21 @@ def contains_genshin(content: str) -> bool:
 @bot.command()
 async def clear(ctx: commands.Context):
     """Clear existing webhooks."""
-    await asyncio.gather(*map(lambda webhook: webhook.delete(), webhook_cache.values()))
+    await asyncio.gather(*map(lambda webhook: webhook.delete(), filter(lambda webhook: webhook.guild == ctx.guild, webhook_cache.values())))
     await ctx.send("Cleared webhooks")
     
 def gif_generator() -> Iterator[str]:
     previous = random.choice(gif_cache)
     yield previous 
     while True:
-        gif_cache.remove(previous)
-        current = random.choice(gif_cache)
-        yield current
-        gif_cache.append(previous)
-        previous = current
+        try:
+            gif_cache.remove(previous)
+            current = random.choice(gif_cache)
+            yield current
+        except Exception:
+            gif_cache.append(previous)
+        else:
+            previous = current
     
 def _make_get_gif_url() -> Callable[[], str]:
     generator = gif_generator()
@@ -145,6 +148,8 @@ def _make_get_gif_url() -> Callable[[], str]:
         return next(generator)
     return get_gif_url
 
-get_gif_url = _make_get_gif_url()
+_get_gif_url = _make_get_gif_url()
+def get_gif_url() -> str:
+    return _get_gif_url()
 
 bot.run(DISCORD_TOKEN)
