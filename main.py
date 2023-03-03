@@ -17,6 +17,7 @@ load_dotenv()
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
     Member = discord.Member
     Webhook = discord.Webhook
     Message = discord.Message
@@ -111,7 +112,7 @@ async def on_message(message: Message):
         return 
     
     if message.author in member_cache and contains_genshin(message.content):
-        gif_url = get_gif_url()
+        gif_url = await get_gif_url()
         author = message.author
         username = author.display_name
         avatar_url = None
@@ -173,24 +174,25 @@ def gif_generator() -> Iterator[str]:
     previous = random.choice(gif_cache)
     yield previous 
     while True:
-        try:
-            gif_cache.remove(previous)
-            current = random.choice(gif_cache)
-            yield current
-        except Exception:
-            gif_cache.append(previous)
-        else:
-            previous = current
+        gif_cache.remove(previous)
+        current = random.choice(gif_cache)
+        yield current
+        gif_cache.append(previous)
+        previous = current
     
-def _make_get_gif_url() -> Callable[[], str]:
+def _make_get_gif_url() -> Callable[[], Awaitable[str]]:
     generator = gif_generator()
-    def get_gif_url() -> str:
-        return next(generator)
+    lock = asyncio.Lock()
+    async def get_gif_url() -> str:
+        await lock.acquire()
+        gif_url = next(generator)
+        lock.release()
+        return gif_url
     return get_gif_url
 
 _get_gif_url = _make_get_gif_url()
-def get_gif_url() -> str:
-    return _get_gif_url()
+async def get_gif_url() -> str:
+    return await _get_gif_url()
 
 def scrape_genshin_characters() -> list[str]:
     r = requests.get("https://genshin.gg/")
