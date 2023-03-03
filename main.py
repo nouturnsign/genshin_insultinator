@@ -115,11 +115,11 @@ async def retry_webhook_send(max_retries: int, channel: MessageableChannel, gif_
 async def on_command_error(ctx: Context, error: commands.errors.CommandError):
     if isinstance(error, commands.errors.CommandNotFound):
         await ctx.send(f"Command not found. Try using `{bot.command_prefix}help`")
-    print(f"Error: {error}")
+    raise error
     
 @bot.command()
 async def add(ctx: Context, *names: str):
-    """Add a member to the insultinator."""
+    """Add a member to the insultinator. Use name, nickname, or name#discriminator to lookup."""
     guild = ctx.guild
     if guild is None:
         return
@@ -127,10 +127,10 @@ async def add(ctx: Context, *names: str):
     for name in names:
         member = guild.get_member_named(name)
         if member is None:
-            await ctx.send(f"Failed to add member with name {name}")
-        else:
-            member_cache.add(member)
-            await ctx.send(f"Successfully added {member.name}#{member.discriminator}")
+            await ctx.send(f"Failed to find member with name: {name}")
+            continue
+        member_cache.add(member)
+        await ctx.send(f"Successfully added: {member.name}#{member.discriminator}")
     
 def contains_genshin(content: str) -> bool:
     return len(find_near_matches("genshin", content.lower(), max_l_dist=1)) > 0
