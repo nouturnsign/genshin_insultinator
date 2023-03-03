@@ -117,6 +117,7 @@ async def retry_webhook_send(max_retries: int, channel: MessageableChannel, gif_
 async def on_command_error(ctx: Context, error: commands.errors.CommandError):
     if isinstance(error, commands.errors.CommandNotFound):
         await ctx.send(f"Command not found. Try using `{bot.command_prefix}help`")
+        return
     raise error
     
 @bot.command()
