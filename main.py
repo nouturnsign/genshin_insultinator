@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Iterator, Set
+from typing import Callable, Dict, Iterator, Optional, Set
 
 import asyncio
 import os
@@ -22,8 +22,8 @@ bot = commands.Bot(
     intents=intents, 
 )
 
-member_id_cache: Set[int] = set()
-webhook_cache: Dict[int, discord.Webhook] = dict()
+member_cache: Set[discord.Member] = set()
+webhook_cache: Dict[discord.abc.MessageableChannel, discord.Webhook] = dict()
 gif_cache = [
     "https://tenor.com/view/genshin-genshin-impact-gif-22076439",
     "https://tenor.com/view/genshin-impact-walter-white-funny-museum-gif-20562746",
@@ -65,39 +65,42 @@ gif_cache = [
 async def on_message(message: discord.Message):
     if not bot.is_ready():
         return 
-    
     if message.author.bot:
         return 
-    
     if message.content.startswith(bot.command_prefix):
         await bot.process_commands(message)
         return 
     
-    if message.author.id in member_id_cache and contains_genshin(message.content):
-        author = message.author
+    if message.author in member_cache and contains_genshin(message.content):
         gif_url = get_gif_url()
+        author = message.author
+        username = author.display_name
         avatar_url = None
         if author.avatar is not None:
             avatar_url = author.avatar.url
             
         channel = message.channel
-        if channel.id not in webhook_cache:
-            webhook_cache[channel.id] = await channel.create_webhook(name="Genshinsultinator webhook")
-        webhook = webhook_cache[channel.id]
+        await retry_webhook_send(3, channel, gif_url, username, avatar_url)
+            
+async def retry_webhook_send(max_retries: int, channel: discord.abc.MessageableChannel, gif_url: str, username: str, avatar_url: Optional[str]):
+    success = False
+    for _ in range(max_retries):
+        if success:
+            break
+        if channel not in webhook_cache:
+            webhook_cache[channel] = await channel.create_webhook(name="Genshinsultinator webhook")
+        webhook = webhook_cache[channel]
         try:
             await webhook.send(
                 gif_url,
-                username=author.display_name,
+                username=username,
                 avatar_url=avatar_url,
             )
+            success = True
         except discord.errors.NotFound:
-            webhook_cache[channel.id] = await channel.create_webhook(name="Genshinsultinator webhook")
-            webhook = webhook_cache[channel.id]
-            await webhook.send(
-                gif_url,
-                username=author.display_name,
-                avatar_url=avatar_url,
-            )
+            webhook_cache[channel] = await channel.create_webhook(name="Genshinsultinator webhook")
+        except Exception as exc:
+            raise exc 
     
 @bot.event
 async def on_command_error(ctx: commands.Context, error: commands.errors.CommandError):
@@ -117,7 +120,7 @@ async def add(ctx: commands.Context, *names: str):
         if member is None:
             await ctx.send(f"Failed to add member with name {name}")
         else:
-            member_id_cache.add(member.id)
+            member_cache.add(member)
             await ctx.send(f"Successfully added {member.name}#{member.discriminator}")
     
 def contains_genshin(content: str) -> bool:
