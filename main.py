@@ -120,27 +120,26 @@ async def on_message(message: Message):
             avatar_url = author.avatar.url
             
         channel = message.channel
-        await retry_webhook_send(3, channel, gif_url, username, avatar_url)
+        message = await retry_webhook_send(3, channel, gif_url, username, avatar_url)
+        await asyncio.sleep(10)
+        await message.delete()
             
-async def retry_webhook_send(max_retries: int, channel: MessageableChannel, gif_url: str, username: str, avatar_url: Optional[str]):
-    success = False
+async def retry_webhook_send(max_retries: int, channel: MessageableChannel, gif_url: str, username: str, avatar_url: Optional[str]) -> Message:
     for _ in range(max_retries):
-        if success:
-            break
         if channel not in webhook_cache:
             webhook_cache[channel] = await channel.create_webhook(name="Genshinsultinator webhook")
         webhook = webhook_cache[channel]
         try:
-            await webhook.send(
+            return await webhook.send(
                 gif_url,
                 username=username,
                 avatar_url=avatar_url,
             )
-            success = True
         except discord.errors.NotFound:
             webhook_cache[channel] = await channel.create_webhook(name="Genshinsultinator webhook")
         except Exception as exc:
             raise exc 
+    return None
     
 @bot.event
 async def on_command_error(ctx: Context, error: commands.errors.CommandError):
