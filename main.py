@@ -218,9 +218,9 @@ def _make_contains_genshin_character() -> Callable[[], bool]:
     try:
         genshin_characters = scrape_genshin_characters()
     except requests.HTTPError:
-        def always_true(content: str) -> Literal[True]:
-            return True
-        return always_true 
+        def always_false(content: str) -> Literal[False]:
+            return False
+        return always_false 
     else:
         genshin_characters_lower = list(map(lambda content: content.lower(), genshin_characters))
         def contains_genshin_character(content: str) -> bool:
