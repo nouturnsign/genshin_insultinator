@@ -120,11 +120,9 @@ async def on_message(message: Message):
             avatar_url = author.avatar.url
             
         channel = message.channel
-        message = await retry_webhook_send(3, channel, gif_url, username, avatar_url)
-        await asyncio.sleep(10)
-        await message.delete()
+        await retry_webhook_send(3, channel, gif_url, username, avatar_url)
             
-async def retry_webhook_send(max_retries: int, channel: MessageableChannel, gif_url: str, username: str, avatar_url: Optional[str]) -> Message:
+async def retry_webhook_send(max_retries: int, channel: MessageableChannel, gif_url: str, username: str, avatar_url: Optional[str]) -> None:
     for _ in range(max_retries):
         if channel not in webhook_cache:
             webhook_cache[channel] = await channel.create_webhook(name="Genshinsultinator webhook")
